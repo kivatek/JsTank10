@@ -12,10 +12,8 @@ var TANK_SPEED		= 8;
 var SHOT_SPEED		= 8;
 // 弾を連続で撃つことができないようにする間隔
 var INTERVAL_COOLDOWN			= 400;
-// 戦車の移動処理の実行間隔
-var INTERVAL_UPDATE_POSITION	= 40;
 // 戦車が向きを変えるときの行動制限時間
-var INTERVAL_TURNING			= 80;
+var INTERVAL_TURNING			= 6;
 
 var Tank = Class.create(Sprite, {
 	initialize: function(type,direction){
@@ -81,15 +79,10 @@ var Tank = Class.create(Sprite, {
 			}
 
 			if (prevDirection != this.direction) {
-				// 向きが変わる場合は使用する絵の番号を更新。
-				this.frame = this.direction * 6 + this.pattern;
 				// 向きを変えた直後は動けないことにする。
 				// これによりキーをちょっと押すだけならばその場で向きを変えることが出来るようになる。
 				this.isTurning = true;
-				var timerTarget = this;
-				setTimeout( function(){
-					timerTarget.isTurning = false;
-				}, INTERVAL_TURNING);
+				this.doTurn();
 			} else {
 				// 向きと移動方向が同じ場合はその方向へ向かって動き始める。
 				if (this.vx || this.vy) {
@@ -100,7 +93,7 @@ var Tank = Class.create(Sprite, {
 					if (0 <= x && x < SCREEN_WIDTH && 0 <= y && y < SCREEN_HEIGHT && !background.hitTest(x, y)) {
 						// 一ブロック分移動した後の座標がステージの範囲内であれば移動処理を開始する。
 						this.isMoving = true;
-						this.updatePosition();
+						this.doMove(x, y);
 					}
 				}
 			}
@@ -111,23 +104,29 @@ var Tank = Class.create(Sprite, {
 		// キー入力ではなくどのように動くかをプログラムで考えます。
 		
 	},
-	updatePosition: function() {
-		// 戦車の位置を更新する関数
-		this.moveBy(this.vx * TANK_SPEED, this.vy * TANK_SPEED);
-		// １ブロック分動いたかどうかを確認する。
-		if ((this.vx && this.x % 32 == 0) || (this.vy && this.y % 32 == 0)) {
-			this.isMoving = false;
-		} else {
-			// 続けて動く処理を行うようタスク登録を行う。
-			var timerTarget = this;
-			setTimeout( function(){
-				timerTarget.updatePosition();
-			}, INTERVAL_UPDATE_POSITION);
-		}
-		
-		// ４方向、３パターンのうちどのフレームを使うかを計算する。
-		this.pattern = (this.pattern + 1) % 3;
+	doTurn: function() {
+		// 向きが変わった場合は使用する絵の番号を更新。
 		this.frame = this.direction * 6 + this.pattern;
+		// Timeline機能を使って向きを変えた後の硬直処理を行う。
+		this.tl
+			.delay(INTERVAL_TURNING)
+			.then(function() {
+				this.isTurning = false;
+			});
+	},
+	doMove: function(x, y) {
+		// Timeline機能を使って移動処理を行う。
+		this.tl
+			.moveTo(x, y, 4, enchant.Easing.LINEAR)
+			.and()
+			.then(function() {
+				// ４方向、３パターンのうちどのフレームを使うかを計算する。
+				this.pattern = (this.pattern + 1) % 3;
+				this.frame = this.direction * 6 + this.pattern;
+			})
+			.then(function() {
+				this.isMoving = false;
+			});
 	}
 });
 
